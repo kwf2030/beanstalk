@@ -1,2 +1,2 @@
 # beanstalk
-beanstalkd客户端Go实现。
+[beanstalkd](https://github.com/kr/beanstalkd)客户端Go实现。
