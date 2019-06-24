@@ -9,14 +9,14 @@ import (
   "net"
   "strings"
   "time"
+
+  "github.com/kwf2030/commons/base"
 )
 
 const (
   mtu     = 1450
   tubeLen = 200
 )
-
-var ErrInvalidArgs = errors.New("invalid args")
 
 var (
   ErrOutOfMemory    = errors.New("out of memory")
@@ -62,7 +62,7 @@ func parseError(str string) error {
   if err, ok := errMap[str]; ok {
     return err
   }
-  return fmt.Errorf("unknown error: %s", str)
+  return errors.New("unknown error: " + str)
 }
 
 func isNetErrorTemporary(err error) bool {
@@ -83,7 +83,7 @@ type Conn struct {
 
 func Dial(host string, port int) (*Conn, error) {
   if port <= 0 {
-    return nil, ErrInvalidArgs
+    return nil, base.ErrInvalidArgs
   }
   addr := fmt.Sprintf("%s:%d", host, port)
   conn, err := net.Dial("tcp", addr)
@@ -146,7 +146,7 @@ func (c *Conn) Put(priority, delay, ttr int, data []byte) (string, error) {
 
 func (c *Conn) Use(tube string) error {
   if tube == "" || len(tube) > tubeLen {
-    return ErrInvalidArgs
+    return base.ErrInvalidArgs
   }
   return c.sendAndRecvExpect(fmt.Sprintf("use %s\r\n", tube), fmt.Sprintf("USING %s\r\n", tube))
 }
@@ -164,14 +164,14 @@ func (c *Conn) ReserveWithTimeout(timeout int) (string, []byte, error) {
 
 func (c *Conn) Delete(id string) error {
   if id == "" {
-    return ErrInvalidArgs
+    return base.ErrInvalidArgs
   }
   return c.sendAndRecvExpect(fmt.Sprintf("delete %s\r\n", id), "DELETED\r\n")
 }
 
 func (c *Conn) Release(id string, priority, delay int) error {
   if id == "" {
-    return ErrInvalidArgs
+    return base.ErrInvalidArgs
   }
   if priority < 0 {
     priority = 0
@@ -184,7 +184,7 @@ func (c *Conn) Release(id string, priority, delay int) error {
 
 func (c *Conn) Bury(id string, priority int) error {
   if id == "" {
-    return ErrInvalidArgs
+    return base.ErrInvalidArgs
   }
   if priority < 0 {
     priority = 0
@@ -194,7 +194,7 @@ func (c *Conn) Bury(id string, priority int) error {
 
 func (c *Conn) Touch(id string) error {
   if id == "" {
-    return ErrInvalidArgs
+    return base.ErrInvalidArgs
   }
   return c.sendAndRecvExpect(fmt.Sprintf("touch %s\r\n", id), "TOUCHED\r\n")
 }
@@ -217,21 +217,21 @@ func (c *Conn) watch(data string) (int, error) {
 
 func (c *Conn) Watch(tube string) (int, error) {
   if tube == "" || len(tube) > tubeLen {
-    return 0, ErrInvalidArgs
+    return 0, base.ErrInvalidArgs
   }
   return c.watch(fmt.Sprintf("watch %s\r\n", tube))
 }
 
 func (c *Conn) Ignore(tube string) (int, error) {
   if tube == "" || len(tube) > tubeLen {
-    return 0, ErrInvalidArgs
+    return 0, base.ErrInvalidArgs
   }
   return c.watch(fmt.Sprintf("ignore %s\r\n", tube))
 }
 
 func (c *Conn) Peek(id string) (string, []byte, error) {
   if id == "" {
-    return "", nil, ErrInvalidArgs
+    return "", nil, base.ErrInvalidArgs
   }
   return c.reqJob(fmt.Sprintf("peek %s\r\n", id), "FOUND")
 }
@@ -250,7 +250,7 @@ func (c *Conn) PeekBuried() (string, []byte, error) {
 
 func (c *Conn) Kick(bound int) (int, error) {
   if bound <= 0 {
-    return 0, ErrInvalidArgs
+    return 0, base.ErrInvalidArgs
   }
   resp, err := c.sendAndRecv(fmt.Sprintf("kick %d\r\n", bound))
   if err != nil {
@@ -269,21 +269,21 @@ func (c *Conn) Kick(bound int) (int, error) {
 
 func (c *Conn) KickJob(id string) error {
   if id == "" {
-    return ErrInvalidArgs
+    return base.ErrInvalidArgs
   }
   return c.sendAndRecvExpect(fmt.Sprintf("kick-job %s\r\n", id), "KICKED\r\n")
 }
 
 func (c *Conn) StatsJob(id string) ([]byte, error) {
   if id == "" {
-    return nil, ErrInvalidArgs
+    return nil, base.ErrInvalidArgs
   }
   return c.reqYaml(fmt.Sprintf("stats-job %s\r\n", id))
 }
 
 func (c *Conn) StatsTube(tube string) ([]byte, error) {
   if tube == "" || len(tube) > tubeLen {
-    return nil, ErrInvalidArgs
+    return nil, base.ErrInvalidArgs
   }
   return c.reqYaml(fmt.Sprintf("stats-tube %s\r\n", tube))
 }
@@ -323,7 +323,7 @@ func (c *Conn) Quit() error {
 
 func (c *Conn) PauseTube(tube string, delay int) error {
   if tube == "" || len(tube) > tubeLen {
-    return ErrInvalidArgs
+    return base.ErrInvalidArgs
   }
   if delay < 0 {
     delay = 0
