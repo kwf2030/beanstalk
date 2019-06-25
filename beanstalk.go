@@ -59,8 +59,8 @@ var errMap = map[string]error{
 }
 
 func parseError(str string) error {
-  if err, ok := errMap[str]; ok {
-    return err
+  if e, ok := errMap[str]; ok {
+    return e
   }
   return errors.New("unknown error: " + str)
 }
@@ -83,12 +83,12 @@ type Conn struct {
 
 func Dial(host string, port int) (*Conn, error) {
   if port <= 0 {
-    return nil, base.ErrInvalidArgs
+    return nil, base.ErrInvalidArgument
   }
   addr := fmt.Sprintf("%s:%d", host, port)
-  conn, err := net.Dial("tcp", addr)
-  if err != nil {
-    return nil, err
+  conn, e := net.Dial("tcp", addr)
+  if e != nil {
+    return nil, e
   }
   return &Conn{
     conn:      conn,
@@ -98,16 +98,16 @@ func Dial(host string, port int) (*Conn, error) {
   }, nil
 }
 
-func (c *Conn) EnableHeartbeat(seconds int) {
+func (c *Conn) EnableHeartbeat(sec int) {
   if c.ticker != nil {
     c.ticker.Stop()
     c.ticker = nil
   }
-  if seconds <= 0 {
+  if sec <= 0 {
     c.heartbeat = 0
     return
   }
-  c.ticker = time.NewTicker(time.Second * time.Duration(seconds))
+  c.ticker = time.NewTicker(time.Second * time.Duration(sec))
   go func() {
     for range c.ticker.C {
       c.Ignore("__heartbeat__")
@@ -132,21 +132,21 @@ func (c *Conn) Put(priority, delay, ttr int, data []byte) (string, error) {
   } else {
     str = fmt.Sprintf("put %d %d %d %d\r\n\r\n", priority, delay, ttr, 0)
   }
-  resp, err := c.sendAndRecv(str)
-  if err != nil {
-    return "", err
+  resp, e := c.sendAndRecv(str)
+  if e != nil {
+    return "", e
   }
   if !strings.HasPrefix(resp, "INSERTED") {
     return "", parseError(resp)
   }
   var id string
-  _, e := fmt.Sscanf(resp, "INSERTED %s\r\n", &id)
+  _, e = fmt.Sscanf(resp, "INSERTED %s\r\n", &id)
   return id, e
 }
 
 func (c *Conn) Use(tube string) error {
   if tube == "" || len(tube) > tubeLen {
-    return base.ErrInvalidArgs
+    return base.ErrInvalidArgument
   }
   return c.sendAndRecvExpect(fmt.Sprintf("use %s\r\n", tube), fmt.Sprintf("USING %s\r\n", tube))
 }
@@ -164,14 +164,14 @@ func (c *Conn) ReserveWithTimeout(timeout int) (string, []byte, error) {
 
 func (c *Conn) Delete(id string) error {
   if id == "" {
-    return base.ErrInvalidArgs
+    return base.ErrInvalidArgument
   }
   return c.sendAndRecvExpect(fmt.Sprintf("delete %s\r\n", id), "DELETED\r\n")
 }
 
 func (c *Conn) Release(id string, priority, delay int) error {
   if id == "" {
-    return base.ErrInvalidArgs
+    return base.ErrInvalidArgument
   }
   if priority < 0 {
     priority = 0
@@ -184,7 +184,7 @@ func (c *Conn) Release(id string, priority, delay int) error {
 
 func (c *Conn) Bury(id string, priority int) error {
   if id == "" {
-    return base.ErrInvalidArgs
+    return base.ErrInvalidArgument
   }
   if priority < 0 {
     priority = 0
@@ -194,44 +194,44 @@ func (c *Conn) Bury(id string, priority int) error {
 
 func (c *Conn) Touch(id string) error {
   if id == "" {
-    return base.ErrInvalidArgs
+    return base.ErrInvalidArgument
   }
   return c.sendAndRecvExpect(fmt.Sprintf("touch %s\r\n", id), "TOUCHED\r\n")
 }
 
 func (c *Conn) watch(data string) (int, error) {
-  resp, err := c.sendAndRecv(data)
-  if err != nil {
-    return 0, err
+  resp, e := c.sendAndRecv(data)
+  if e != nil {
+    return 0, e
   }
   if !strings.HasPrefix(resp, "WATCHING") {
     return 0, parseError(resp)
   }
   var count int
-  _, err = fmt.Sscanf(resp, "WATCHING %d\r\n", &count)
-  if err != nil {
-    return 0, err
+  _, e = fmt.Sscanf(resp, "WATCHING %d\r\n", &count)
+  if e != nil {
+    return 0, e
   }
   return count, nil
 }
 
 func (c *Conn) Watch(tube string) (int, error) {
   if tube == "" || len(tube) > tubeLen {
-    return 0, base.ErrInvalidArgs
+    return 0, base.ErrInvalidArgument
   }
   return c.watch(fmt.Sprintf("watch %s\r\n", tube))
 }
 
 func (c *Conn) Ignore(tube string) (int, error) {
   if tube == "" || len(tube) > tubeLen {
-    return 0, base.ErrInvalidArgs
+    return 0, base.ErrInvalidArgument
   }
   return c.watch(fmt.Sprintf("ignore %s\r\n", tube))
 }
 
 func (c *Conn) Peek(id string) (string, []byte, error) {
   if id == "" {
-    return "", nil, base.ErrInvalidArgs
+    return "", nil, base.ErrInvalidArgument
   }
   return c.reqJob(fmt.Sprintf("peek %s\r\n", id), "FOUND")
 }
@@ -250,17 +250,17 @@ func (c *Conn) PeekBuried() (string, []byte, error) {
 
 func (c *Conn) Kick(bound int) (int, error) {
   if bound <= 0 {
-    return 0, base.ErrInvalidArgs
+    return 0, base.ErrInvalidArgument
   }
-  resp, err := c.sendAndRecv(fmt.Sprintf("kick %d\r\n", bound))
-  if err != nil {
-    return 0, err
+  resp, e := c.sendAndRecv(fmt.Sprintf("kick %d\r\n", bound))
+  if e != nil {
+    return 0, e
   }
   if !strings.HasPrefix(resp, "KICKED") {
     return 0, parseError(resp)
   }
   var id int
-  _, e := fmt.Sscanf(resp, "KICKED %d\r\n", &id)
+  _, e = fmt.Sscanf(resp, "KICKED %d\r\n", &id)
   if e != nil {
     return 0, e
   }
@@ -269,21 +269,21 @@ func (c *Conn) Kick(bound int) (int, error) {
 
 func (c *Conn) KickJob(id string) error {
   if id == "" {
-    return base.ErrInvalidArgs
+    return base.ErrInvalidArgument
   }
   return c.sendAndRecvExpect(fmt.Sprintf("kick-job %s\r\n", id), "KICKED\r\n")
 }
 
 func (c *Conn) StatsJob(id string) ([]byte, error) {
   if id == "" {
-    return nil, base.ErrInvalidArgs
+    return nil, base.ErrInvalidArgument
   }
   return c.reqYaml(fmt.Sprintf("stats-job %s\r\n", id))
 }
 
 func (c *Conn) StatsTube(tube string) ([]byte, error) {
   if tube == "" || len(tube) > tubeLen {
-    return nil, base.ErrInvalidArgs
+    return nil, base.ErrInvalidArgument
   }
   return c.reqYaml(fmt.Sprintf("stats-tube %s\r\n", tube))
 }
@@ -297,17 +297,17 @@ func (c *Conn) ListTubes() ([]byte, error) {
 }
 
 func (c *Conn) ListTubeUsed() (string, error) {
-  resp, err := c.sendAndRecv("list-tube-used\r\n")
-  if err != nil {
-    return "", err
+  resp, e := c.sendAndRecv("list-tube-used\r\n")
+  if e != nil {
+    return "", e
   }
   if !strings.HasPrefix(resp, "USING") {
     return "", parseError(resp)
   }
   var tube string
-  _, err = fmt.Sscanf(resp, "USING %s\r\n", &tube)
-  if err != nil {
-    return "", err
+  _, e = fmt.Sscanf(resp, "USING %s\r\n", &tube)
+  if e != nil {
+    return "", e
   }
   return tube, nil
 }
@@ -323,7 +323,7 @@ func (c *Conn) Quit() error {
 
 func (c *Conn) PauseTube(tube string, delay int) error {
   if tube == "" || len(tube) > tubeLen {
-    return base.ErrInvalidArgs
+    return base.ErrInvalidArgument
   }
   if delay < 0 {
     delay = 0
@@ -332,61 +332,61 @@ func (c *Conn) PauseTube(tube string, delay int) error {
 }
 
 func (c *Conn) reqJob(data, prefix string) (string, []byte, error) {
-  resp, err := c.sendAndRecv(data)
-  if err != nil {
-    return "", nil, err
+  resp, e := c.sendAndRecv(data)
+  if e != nil {
+    return "", nil, e
   }
   if !strings.HasPrefix(resp, prefix) {
     return "", nil, parseError(resp)
   }
   var id string
   var l int
-  _, err = fmt.Sscanf(resp, prefix+" %s %d\r\n", &id, &l)
-  if err != nil {
-    return "", nil, err
+  _, e = fmt.Sscanf(resp, prefix+" %s %d\r\n", &id, &l)
+  if e != nil {
+    return "", nil, e
   }
-  body, err := c.readBody(l)
-  if err != nil {
-    return "", nil, err
+  body, e := c.readBody(l)
+  if e != nil {
+    return "", nil, e
   }
   job := make([]byte, base64.RawStdEncoding.DecodedLen(len(body)))
-  _, err = base64.RawStdEncoding.Decode(job, body)
-  if err != nil {
-    return "", nil, err
+  _, e = base64.RawStdEncoding.Decode(job, body)
+  if e != nil {
+    return "", nil, e
   }
   return id, job, nil
 }
 
 func (c *Conn) reqYaml(data string) ([]byte, error) {
-  resp, err := c.sendAndRecv(data)
-  if err != nil {
-    return nil, err
+  resp, e := c.sendAndRecv(data)
+  if e != nil {
+    return nil, e
   }
   if !strings.HasPrefix(resp, "OK") {
     return nil, parseError(resp)
   }
   var l int
-  _, err = fmt.Sscanf(resp, "OK %d\r\n", &l)
-  if err != nil {
-    return nil, err
+  _, e = fmt.Sscanf(resp, "OK %d\r\n", &l)
+  if e != nil {
+    return nil, e
   }
-  body, err := c.readBody(l)
-  return body, err
+  body, e := c.readBody(l)
+  return body, e
 }
 
 func (c *Conn) readBody(l int) ([]byte, error) {
   body := make([]byte, l+2)
-  n, err := io.ReadFull(c.bufReader, body)
-  if err != nil {
-    return nil, err
+  n, e := io.ReadFull(c.bufReader, body)
+  if e != nil {
+    return nil, e
   }
   return body[:n-2], nil
 }
 
 func (c *Conn) sendAndRecvExpect(data, expected string) error {
-  resp, err := c.sendAndRecv(data)
-  if err != nil {
-    return err
+  resp, e := c.sendAndRecv(data)
+  if e != nil {
+    return e
   }
   if resp != expected {
     return parseError(resp)
@@ -395,13 +395,13 @@ func (c *Conn) sendAndRecvExpect(data, expected string) error {
 }
 
 func (c *Conn) sendAndRecv(data string) (string, error) {
-  _, err := c.send([]byte(data))
-  if err != nil {
-    return "", err
+  _, e := c.send([]byte(data))
+  if e != nil {
+    return "", e
   }
-  resp, err := c.bufReader.ReadString('\n')
-  if err != nil {
-    return "", err
+  resp, e := c.bufReader.ReadString('\n')
+  if e != nil {
+    return "", e
   }
   return resp, nil
 }
@@ -411,23 +411,23 @@ func (c *Conn) send(data []byte) (int, error) {
   l := len(data)
   if l <= mtu {
     for total < l {
-      n, err := c.conn.Write(data)
+      n, e := c.conn.Write(data)
       total += n
-      if err != nil && !isNetErrorTemporary(err) {
-        return total, err
+      if e != nil && !isNetErrorTemporary(e) {
+        return total, e
       }
       data = data[n:]
     }
   } else {
     for total < l {
-      n, err := c.bufWriter.Write(data)
+      n, e := c.bufWriter.Write(data)
       total += n
-      if err != nil && !isNetErrorTemporary(err) {
-        return total, err
+      if e != nil && !isNetErrorTemporary(e) {
+        return total, e
       }
-      err = c.bufWriter.Flush()
-      if err != nil && !isNetErrorTemporary(err) {
-        return total, err
+      e = c.bufWriter.Flush()
+      if e != nil && !isNetErrorTemporary(e) {
+        return total, e
       }
       data = data[n:]
     }
